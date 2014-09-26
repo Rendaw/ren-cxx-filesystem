@@ -123,7 +123,6 @@ PathT PathElementT::Enter(std::string const &Value) const
 	return PathT(new PathElementT(this, Value));
 }
 
-//std::regex ElementRegex("[/\\\\]+([^/\\\\]+)");
 std::regex ElementRegex("([^/\\\\]*)[/\\\\]+");
 PathT PathElementT::EnterRaw(std::string const &Raw) const
 {
@@ -155,8 +154,7 @@ PathT PathElementT::Exit(void) const
 bool PathElementT::Exists(void) const
 {
 #ifdef _WIN32
-	return GetFileAttributesW(&ToNativeString("\\\\?\\" + Render())[0]) != 0xFFFFFFFF; // Doesn't work for some reason -- mixed slashes?
-	//return GetFileAttributesW(&ToNativeString(Render())[0]) != 0xFFFFFFFF;
+	return GetFileAttributesW(&ToNativeString("\\\\?\\" + Render())[0]) != INVALID_FILE_ATTRIBUTES;
 #else
 	struct stat StatResultBuffer;
 	return stat(Render().c_str(), &StatResultBuffer) == 0;
@@ -182,7 +180,8 @@ bool PathElementT::FileExists(void) const
 bool PathElementT::DirectoryExists(void) const
 {
 #ifdef _WIN32
-        return GetFileAttributesW(reinterpret_cast<wchar_t const *>(AsNativeString("\\\\?\\" + Render()).c_str())) & 0x10;
+        return GetFileAttributesW(&ToNativeString("\\\\?\\" + Render())[0]) & 0x10;
+        //return GetFileAttributesW(&ToNativeString(Render())[0]) & 0x10;
 #else
         struct stat StatResultBuffer;
         int Result = stat(Render().c_str(), &StatResultBuffer);
@@ -202,7 +201,7 @@ static bool ProcessDirectoryContents(PathT const &DirectoryName, std::function<v
 
         do
         {
-                auto FindName = FromNativeString(ElementInfo.cFileName, _tcslen(ElementInfo.cFileName));
+                auto FindName = FromNativeString(ElementInfo.cFileName, wcslen(ElementInfo.cFileName));
 		if (FindName == ".") continue;
 		if (FindName == "..") continue;
                 Process(
@@ -271,7 +270,7 @@ bool PathElementT::DeleteDirectory(void) const
 		else
 		{
 #ifdef _WIN32
-			if (RemoveDirectoryW(&ToNativeString(Directories.back().first->Render)[0]) == 0)
+			if (RemoveDirectoryW(&ToNativeString(Directories.back().first->Render())[0]) == 0)
 				return false;
 #else
 			if (rmdir(Directories.back().first->Render().c_str()) != 0)
@@ -294,15 +293,18 @@ bool PathElementT::CreateDirectory(void) const
 			Part = Part.Get<PathElementT const *>()->Parent;
 		}
 	}
+	Parts.pop_front();
 	for (auto &Part : Parts)
 	{
 #ifdef _WIN32
-		int Result = _wmkdir(&ToNativeString(Part->Render())[0]);
+		auto Result = CreateDirectoryW(&ToNativeString("\\\\?\\" + Part->Render())[0], nullptr);
+		if ((Result == 0) && (GetLastError() != ERROR_ALREADY_EXISTS)) 
+			return false;
 #else
-		int Result = mkdir(Part->Render().c_str(), 0777);
-#endif
+		auto Result = mkdir(Part->Render().c_str(), 0777);
 		if (Result == -1 && errno != EEXIST)
 			return false;
+#endif
 	}
 	return true;
 }
@@ -310,7 +312,7 @@ bool PathElementT::CreateDirectory(void) const
 bool PathElementT::GoTo(void) const
 {
 #ifdef _WIN32
-	return SetCurrentDirectory(&ToNativeString(Render())[0]);
+	return SetCurrentDirectoryW(&ToNativeString(Render())[0]);
 #else
 	return chdir(Render().c_str()) == 0;
 #endif
@@ -338,10 +340,10 @@ PathT PathT::Absolute(std::string const &Raw)
 PathT PathT::Here(void)
 {
 #ifdef _WIN32
-	std::vector<char> Buffer(GetCurrentDirectory(0, nullptr));
-	if (!GetCurrentDirectory(Buffer.size(), &Buffer[0]))
+	std::vector<wchar_t> Buffer(GetCurrentDirectoryW(0, nullptr));
+	if (!GetCurrentDirectoryW(Buffer.size(), &Buffer[0]))
 		throw ConstructionErrorT() << "Couldn't obtain working directory!";
-	return Absolute(std::string(&Buffer[0], Buffer.size()));
+	return Absolute(FromNativeString(&Buffer[0], Buffer.size() - 1));
 #else
 	std::vector<char> Buffer(FILENAME_MAX);
 	if (!getcwd(&Buffer[0], Buffer.size())) throw ConstructionErrorT() << "Couldn't obtain working directory!";
@@ -411,7 +413,7 @@ PathT PathT::Temp(bool File, OptionalT<PathT> const &Base)
 			auto Result = _wmkdir(&BaseString[0]);
 			if (Result == -1)
 				std::cout << "Failed to create temporary directory (" << strerror(errno) << ")." << std::endl;
-			else return Absolute(FromNativeString(BaseString, BaseString.length() - 1));
+			else return Absolute(FromNativeString(&BaseString[0], BaseString.size() - 1));
 		}
 		throw ConstructionErrorT() << "Failed to create temporary directory 3 times (" << strerror(errno) << ").";
 	}

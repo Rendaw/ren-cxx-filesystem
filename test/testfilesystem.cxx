@@ -6,35 +6,37 @@
 int main(int, char **)
 {
 #ifdef WINDOWS
+#define SEP "\\"
 	std::string Prefix("c:");
 #else
+#define SEP "/"
 	std::string Prefix("");
 #endif
-	AssertE(Filesystem::PathT::Absolute(Prefix + "/")->Render(), Prefix + "/");
+	AssertE(Filesystem::PathT::Absolute(Prefix + "/")->Render(), Prefix + SEP);
 	AssertE(Filesystem::PathT::Absolute(Prefix + "/")->Depth(), 0);
-	AssertE(Filesystem::PathT::Absolute(Prefix + "/a")->Render(), Prefix + "/a");
+	AssertE(Filesystem::PathT::Absolute(Prefix + "/a")->Render(), Prefix + SEP "a");
 	AssertE(Filesystem::PathT::Absolute(Prefix + "/a")->Depth(), 1);
-	AssertE(Filesystem::PathT::Absolute(Prefix + "/a/")->Render(), Prefix + "/a");
+	AssertE(Filesystem::PathT::Absolute(Prefix + "/a/")->Render(), Prefix + SEP "a");
 	AssertE(Filesystem::PathT::Absolute(Prefix + "/a/")->Depth(), 1);
-	AssertE(Filesystem::PathT::Absolute(Prefix + "/a/1")->Render(), Prefix + "/a/1");
+	AssertE(Filesystem::PathT::Absolute(Prefix + "/a/1")->Render(), Prefix + SEP "a" SEP "1");
 	AssertE(Filesystem::PathT::Absolute(Prefix + "/a/1")->Depth(), 2);
-	AssertE(Filesystem::PathT::Absolute(Prefix + "/a/1/")->Render(), Prefix + "/a/1");
-	AssertE(Filesystem::PathT::Absolute(Prefix + "/./")->Render(), Prefix + "/");
-	AssertE(Filesystem::PathT::Absolute(Prefix + "/a/./")->Render(), Prefix + "/a");
-	AssertE(Filesystem::PathT::Absolute(Prefix + "/a/./1")->Render(), Prefix + "/a/1");
-	AssertE(Filesystem::PathT::Absolute(Prefix + "/a/..")->Render(), Prefix + "/");
-	AssertE(Filesystem::PathT::Absolute(Prefix + "/a/../1")->Render(), Prefix + "/1");
-	Assert(Filesystem::PathT::Absolute(Prefix + "/")->Contains(Filesystem::PathT::Absolute(Prefix + "/")));
-	Assert(!Filesystem::PathT::Absolute(Prefix + "/a")->Contains(Filesystem::PathT::Absolute(Prefix + "/")));
-	Assert(Filesystem::PathT::Absolute(Prefix + "/")->Contains(Filesystem::PathT::Absolute(Prefix + "/a")));
-	Assert(!Filesystem::PathT::Absolute(Prefix + "/a")->Contains(Filesystem::PathT::Absolute(Prefix + "/b")));
-	Assert(!Filesystem::PathT::Absolute(Prefix + "/a/1")->Contains(Filesystem::PathT::Absolute(Prefix + "/a/2")));
+	AssertE(Filesystem::PathT::Absolute(Prefix + "/a/1/")->Render(), Prefix + SEP "a" SEP "1");
+	AssertE(Filesystem::PathT::Absolute(Prefix + "/./")->Render(), Prefix + SEP);
+	AssertE(Filesystem::PathT::Absolute(Prefix + "/a/./")->Render(), Prefix + SEP "a");
+	AssertE(Filesystem::PathT::Absolute(Prefix + "/a/./1")->Render(), Prefix + SEP "a" SEP "1");
+	AssertE(Filesystem::PathT::Absolute(Prefix + "/a/..")->Render(), Prefix + SEP);
+	AssertE(Filesystem::PathT::Absolute(Prefix + "/a/../1")->Render(), Prefix + SEP "1");
+	Assert(Filesystem::PathT::Absolute(Prefix + "/")->Contains(Filesystem::PathT::Absolute(Prefix + SEP)));
+	Assert(!Filesystem::PathT::Absolute(Prefix + "/a")->Contains(Filesystem::PathT::Absolute(Prefix + SEP)));
+	Assert(Filesystem::PathT::Absolute(Prefix + "/")->Contains(Filesystem::PathT::Absolute(Prefix + SEP "a")));
+	Assert(!Filesystem::PathT::Absolute(Prefix + "/a")->Contains(Filesystem::PathT::Absolute(Prefix + SEP "b")));
+	Assert(!Filesystem::PathT::Absolute(Prefix + "/a/1")->Contains(Filesystem::PathT::Absolute(Prefix + SEP "a" SEP "2")));
 	AssertE(Filesystem::PathT::Absolute(Prefix + "/c.txt")->Filename(), "c.txt");
 	Assert(Filesystem::PathT::Here()->Enter("filesystemtesttree")->Enter("a")->Enter("1.txt")->Exists());
 	Assert(!Filesystem::PathT::Here()->Enter("filesystemtesttree")->Enter("a")->Enter("9.txt")->Exists());
-	AssertE(Filesystem::PathT::Absolute(Prefix + "/c.txt")->Directory(), Prefix + "/");
+	AssertE(Filesystem::PathT::Absolute(Prefix + "/c.txt")->Directory(), Prefix + SEP);
 	AssertE(Filesystem::PathT::Absolute(Prefix + "/a/c.txt")->Filename(), "c.txt");
-	AssertE(Filesystem::PathT::Absolute(Prefix + "/a/c.txt")->Directory(), Prefix + "/a");
+	AssertE(Filesystem::PathT::Absolute(Prefix + "/a/c.txt")->Directory(), Prefix + SEP "a");
 
 	// ascii
 	{
@@ -44,19 +46,19 @@ int main(int, char **)
 			Test3("lovely");
 
 		auto Root = Filesystem::PathT::Qualify(Test3);
-		Root->CreateDirectory();
+		Assert(Root->CreateDirectory());
 		Assert(Root->Exists());
 		Assert(Root->GoTo());
 
 		auto TestPath = Filesystem::PathT::Qualify(Test1 + "/" + Test2 + "/" + Test3 + ".txt");
 		AssertE(TestPath->Filename(), Test3 + ".txt");
-		AssertE(Filesystem::PathT::Qualify(Prefix + "/")->Enter(Test1)->Render(), Prefix + "/" + Test1);
+		AssertE(Filesystem::PathT::Qualify(Prefix + "/")->Enter(Test1)->Render(), Prefix + SEP + Test1);
 
 		Assert(TestPath->Exit()->CreateDirectory());
-		auto Created = Filesystem::fopen(TestPath->Render(), "w");
+		auto Created = Filesystem::fopen_write(TestPath->Render());
 		Assert(Created);
 		fclose(Created);
-		auto Opened = Filesystem::fopen(TestPath->Render(), "r");
+		auto Opened = Filesystem::fopen_read(TestPath->Render());
 		Assert(Created);
 		fclose(Opened);
 		Assert(TestPath->Exit()->DeleteDirectory());
@@ -80,13 +82,13 @@ int main(int, char **)
 
 		auto TestPath = Filesystem::PathT::Qualify(Test1 + "/" + Test2 + "/" + Test3 + ".txt");
 		AssertE(TestPath->Filename(), Test3 + ".txt");
-		AssertE(Filesystem::PathT::Qualify(Prefix + "/")->Enter(Test1)->Render(), Prefix + "/" + Test1);
+		AssertE(Filesystem::PathT::Qualify(Prefix + "/")->Enter(Test1)->Render(), Prefix + SEP + Test1);
 
 		Assert(TestPath->Exit()->CreateDirectory());
-		auto Created = Filesystem::fopen(TestPath->Render(), "w");
+		auto Created = Filesystem::fopen_write(TestPath->Render());
 		Assert(Created);
 		fclose(Created);
-		auto Opened = Filesystem::fopen(TestPath->Render(), "r");
+		auto Opened = Filesystem::fopen_read(TestPath->Render());
 		Assert(Created);
 		fclose(Opened);
 		Assert(TestPath->Exit()->DeleteDirectory());

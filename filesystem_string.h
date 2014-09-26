@@ -21,19 +21,18 @@ inline std::vector<wchar_t> ToNativeString(std::string const &Input) // Return c
 	if (Input.empty()) return {};
 	const int Length = MultiByteToWideChar(CP_UTF8, 0, Input.c_str(), Input.length(), nullptr, 0);
 	AssertGT(Length, 0);
-	std::vector<wchar_t> ConversionBuffer;
-	ConversionBuffer.resize(Length);
+	std::vector<wchar_t> ConversionBuffer(Length + 1);
 	MultiByteToWideChar(CP_UTF8, 0, Input.c_str(), Input.length(), (LPWSTR)&ConversionBuffer[0], Length);
+	ConversionBuffer[Length] = 0;
 	return ConversionBuffer;
 }
 
 inline std::string FromNativeString(wchar_t const *Input, size_t InputLength)
 {
-	const int Length = WideCharToMultiByte(CP_UTF8, 0, Input, InputLength - 1, nullptr, 0, nullptr, nullptr);
+	const int Length = WideCharToMultiByte(CP_UTF8, 0, Input, InputLength, nullptr, 0, nullptr, nullptr);
 	AssertGT(Length, 0);
-	std::vector<char> ConversionBuffer;
-	ConversionBuffer.resize(Length);
-	WideCharToMultiByte(CP_UTF8, 0, Input, InputLength - 1, &ConversionBuffer[0], Length, nullptr, nullptr);
+	std::vector<char> ConversionBuffer(Length);
+	WideCharToMultiByte(CP_UTF8, 0, Input, InputLength, &ConversionBuffer[0], Length, nullptr, nullptr);
 	return std::string(&ConversionBuffer[0], Length);
 }
 

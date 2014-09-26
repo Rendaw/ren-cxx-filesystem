@@ -8,15 +8,15 @@ namespace Filesystem
 {
 
 #ifdef __WIN32
-inline FILE *fopen(std::string const &Filename, char const *mode)
-{
-	return _wfopen(&ToNativeString(Filename)[0], mode);
-}
+inline FILE *fopen_read(std::string const &Filename)
+	{ return _wfopen(&ToNativeString(Filename)[0], L"r"); }
+inline FILE *fopen_write(std::string const &Filename)
+	{ return _wfopen(&ToNativeString(Filename)[0], L"w"); }
 #else
-inline FILE *fopen(std::string const &Filename, char const *mode)
-{
-	return ::fopen(Filename.c_str(), mode);
-}
+inline FILE *fopen_read(std::string const &Filename)
+	{ return ::fopen(Filename.c_str(), "r"); }
+inline FILE *fopen_write(std::string const &Filename)
+	{ return ::fopen(Filename.c_str(), "w"); }
 #endif
 
 struct PathSettingsT
