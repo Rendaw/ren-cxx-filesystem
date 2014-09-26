@@ -1,7 +1,7 @@
 #ifndef string_h
 #define string_h
 
-#include "extrastandard.h"
+#include "../ren-cxx-basics/extrastandard.h"
 
 #include <string>
 #include <map>
@@ -15,27 +15,30 @@
 
 #ifdef WINDOWS
 
-inline std::u16string ToNativeString(std::string const &Input)
+inline std::vector<wchar_t> ToNativeString(std::string const &Input) // Return contains 0 at size() - 1
 {
 	static_assert(sizeof(wchar_t) == sizeof(char16_t), "Assumption that all Windows systems use 16-bit wide characters failed!");
 	if (Input.empty()) return {};
 	const int Length = MultiByteToWideChar(CP_UTF8, 0, Input.c_str(), Input.length(), nullptr, 0);
 	AssertGT(Length, 0);
-	std::vector<char16_t> ConversionBuffer;
+	std::vector<wchar_t> ConversionBuffer;
 	ConversionBuffer.resize(Length);
 	MultiByteToWideChar(CP_UTF8, 0, Input.c_str(), Input.length(), (LPWSTR)&ConversionBuffer[0], Length);
-	return std::u16string(&ConversionBuffer[0], Length);
+	return ConversionBuffer;
 }
 
-inline std::string FromNativeString(std::u16string const &Input)
+inline std::string FromNativeString(wchar_t const *Input, size_t InputLength)
 {
-	const int Length = WideCharToMultiByte(CP_UTF8, 0, reinterpret_cast<wchar_t const *>(Input.c_str()), Input.length(), nullptr, 0, nullptr, nullptr);
+	const int Length = WideCharToMultiByte(CP_UTF8, 0, Input, InputLength - 1, nullptr, 0, nullptr, nullptr);
 	AssertGT(Length, 0);
 	std::vector<char> ConversionBuffer;
 	ConversionBuffer.resize(Length);
-	WideCharToMultiByte(CP_UTF8, 0, reinterpret_cast<wchar_t const *>(Input.c_str()), Input.length(), &ConversionBuffer[0], Length, nullptr, nullptr);
+	WideCharToMultiByte(CP_UTF8, 0, Input, InputLength - 1, &ConversionBuffer[0], Length, nullptr, nullptr);
 	return std::string(&ConversionBuffer[0], Length);
 }
+
+inline std::string FromNativeString(std::vector<wchar_t> const &Input) // Input must not be null terminated
+	{ return FromNativeString(&Input[0], Input.size()); }
 
 #else
 

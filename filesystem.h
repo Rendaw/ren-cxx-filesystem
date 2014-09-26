@@ -1,11 +1,23 @@
 #ifndef filesystem_h
 #define filesystem_h
 
-#include "type.h"
+#include "../ren-cxx-basics/type.h"
 #include "filesystem_string.h"
 
 namespace Filesystem
 {
+
+#ifdef __WIN32
+inline FILE *fopen(std::string const &Filename, char const *mode)
+{
+	return _wfopen(&ToNativeString(Filename)[0], mode);
+}
+#else
+inline FILE *fopen(std::string const &Filename, char const *mode)
+{
+	return ::fopen(Filename.c_str(), mode);
+}
+#endif
 
 struct PathSettingsT
 {
@@ -20,6 +32,11 @@ struct PathElementT
 	~PathElementT(void);
 	
 	std::string Render(void) const;
+	std::string const &Filename(void) const;
+	std::string Directory(void) const;
+	OptionalT<std::string> Extension(void) const;
+
+	size_t Depth(void) const;
 
 	bool Contains(PathElementT const *Other) const;
 	
@@ -30,14 +47,14 @@ struct PathElementT
 	bool Exists(void) const;
 	bool FileExists(void) const;
 	bool DirectoryExists(void) const;
-	bool Delete(void) const;
-	bool CreateDirectory(void) const;
-	size_t Depth(void) const;
-	std::string const &Filename(void) const;
-	std::string Directory(void) const;
-	OptionalT<std::string> Extension(void) const;
 
-	void Go(void) const;
+	bool List(std::function<bool(PathT &&Path, bool IsFile, bool IsDir)> const &Callback) const;
+
+	bool Delete(void) const;
+	bool DeleteDirectory(void) const;
+	bool CreateDirectory(void) const;
+
+	bool GoTo(void) const;
 
 	private:
 		friend struct PathT;

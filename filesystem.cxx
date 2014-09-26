@@ -10,8 +10,8 @@
 
 struct SeedRandomT
 {
-	SeedRandomT(void) 
-	{ 
+	SeedRandomT(void)
+	{
 		srand(time(NULL));
 	}
 } static SeedRandom;
@@ -69,7 +69,31 @@ std::string PathElementT::Render(void) const
 	}
 	return Out.str();
 }
-	
+
+std::string const &PathElementT::Filename(void) const { return Value; }
+
+std::string PathElementT::Directory(void) const { return Parent.Is<PathElementT const *>() ? Parent.Get<PathElementT const *>()->Render() : Render(); }
+
+OptionalT<std::string> PathElementT::Extension(void) const
+{
+	std::smatch Matches;
+	std::regex_search(Value, Matches, std::regex("\\.([^.]+)$"));
+	for (auto &Match : Matches) return Match.str();
+	return {};
+}
+
+size_t PathElementT::Depth(void) const
+{
+	size_t Count = 0;
+	VariantT <PathElementT const *, PathSettingsT *> Part(this);
+	while (Part.Is<PathElementT const *>())
+	{
+		++Count;
+		Part = Part.Get<PathElementT const *>()->Parent;
+	}
+	return Count - 1;
+}
+
 bool PathElementT::Contains(PathElementT const *Other) const
 {
 	PathElementT const *Candidates[2]{this, Other};
@@ -99,23 +123,29 @@ PathT PathElementT::Enter(std::string const &Value) const
 	return PathT(new PathElementT(this, Value));
 }
 
-std::regex ElementRegex("[/\\\\]+([^/\\\\]+)");
+//std::regex ElementRegex("[/\\\\]+([^/\\\\]+)");
+std::regex ElementRegex("([^/\\\\]*)[/\\\\]+");
 PathT PathElementT::EnterRaw(std::string const &Raw) const
 {
 	std::string Text = Raw;
 	PathT Out(this);
-	std::smatch Matches;
-	while (std::regex_search(Text, Matches, ElementRegex)) 
+	auto HandleMatch = [&](auto const &Match)
 	{
-		if (Matches[1] == ".") continue;
-		else if (Matches[1] == "..") Out = Out->Exit();
-		else Out = Out->Enter(Matches[1]);
+		if (Match.length() == 0) {}
+		else if (Match == ".") {}
+		else if (Match == "..") Out = Out->Exit();
+		else Out = Out->Enter(Match);
+	};
+	std::smatch Matches;
+	while (std::regex_search(Text, Matches, ElementRegex))
+	{
+		HandleMatch(Matches[1]);
 		Text = Matches.suffix().str();
 	}
-	if (!Text.empty()) Out = Out->Enter(Text);
+	HandleMatch(Text);
 	return Out;
 }
-	
+
 PathT PathElementT::Exit(void) const
 {
 	if (Parent.Is<PathSettingsT *>()) throw ConstructionErrorT() << "Cannot exit root path.";
@@ -125,8 +155,19 @@ PathT PathElementT::Exit(void) const
 bool PathElementT::Exists(void) const
 {
 #ifdef _WIN32
-	//DWORD Attributes = GetFileAttributesW(reinterpret_cast<wchar_t const *>(ToNativeString("\\\\?\\" + AsAbsoluteString()).c_str())); // Doesn't work for some reason -- mixed slashes?
-	DWORD Attributes = GetFileAttributesW(reinterpret_cast<wchar_t const *>(ToNativeString(Render()).c_str()));
+	return GetFileAttributesW(&ToNativeString("\\\\?\\" + Render())[0]) != 0xFFFFFFFF; // Doesn't work for some reason -- mixed slashes?
+	//return GetFileAttributesW(&ToNativeString(Render())[0]) != 0xFFFFFFFF;
+#else
+	struct stat StatResultBuffer;
+	return stat(Render().c_str(), &StatResultBuffer) == 0;
+#endif
+}
+
+bool PathElementT::FileExists(void) const
+{
+#ifdef _WIN32
+	auto Attributes = GetFileAttributesW(&ToNativeString("\\\\?\\" + Render())[0]); // Doesn't work for some reason -- mixed slashes?
+	//auto Attributes = GetFileAttributesW(&ToNativeString(Render())[0]);
 	if (Attributes == 0xFFFFFFFF) return false;
 	if (Attributes == 0x10) return false;
 	return true;
@@ -138,27 +179,108 @@ bool PathElementT::Exists(void) const
 #endif
 }
 
-bool PathElementT::FileExists(void) const
+bool PathElementT::DirectoryExists(void) const
 {
-	// TODO
-	Assert(false);
+#ifdef _WIN32
+        return GetFileAttributesW(reinterpret_cast<wchar_t const *>(AsNativeString("\\\\?\\" + Render()).c_str())) & 0x10;
+#else
+        struct stat StatResultBuffer;
+        int Result = stat(Render().c_str(), &StatResultBuffer);
+        if (Result != 0) return false;
+        return S_ISDIR(StatResultBuffer.st_mode);
+#endif
+}
+
+static bool ProcessDirectoryContents(PathT const &DirectoryName, std::function<void(std::string const &Element, bool IsFile, bool IsDir)> const &Process)
+{
+#ifdef _WIN32
+        WIN32_FIND_DATAW ElementInfo;
+        auto DirectoryResource = FindFirstFileW(
+		&ToNativeString(DirectoryName->Render() + "\\*")[0],
+		&ElementInfo);
+        if (DirectoryResource == INVALID_HANDLE_VALUE) return false;
+
+        do
+        {
+                auto FindName = FromNativeString(ElementInfo.cFileName, _tcslen(ElementInfo.cFileName));
+		if (FindName == ".") continue;
+		if (FindName == "..") continue;
+                Process(
+			FindName,
+			ElementInfo.dwFileAttributes & ~FILE_ATTRIBUTE_DIRECTORY,
+			!(ElementInfo.dwFileAttributes & ~FILE_ATTRIBUTE_DIRECTORY));
+        } while (FindNextFileW(DirectoryResource, &ElementInfo) != 0);
+
+        FindClose(DirectoryResource);
+#else
+        auto DirectoryResource = opendir(DirectoryName->Render().c_str());
+        if (DirectoryResource == nullptr) return false;
+
+        dirent *ElementInfo;
+        while ((ElementInfo = readdir(DirectoryResource)) != nullptr)
+        {
+		std::string ElementName(ElementInfo->d_name);
+                if ((ElementName == ".") || (ElementName == "..")) continue;
+                Process(
+			ElementName,
+			ElementInfo->d_type != DT_DIR, 
+			ElementInfo->d_type == DT_DIR);
+        }
+
+        closedir(DirectoryResource);
+#endif
 	return true;
 }
 
-bool PathElementT::DirectoryExists(void) const
+bool PathElementT::List(std::function<bool(PathT &&Path, bool IsFile, bool IsDir)> const &Callback) const
 {
-	// TODO
-	Assert(false);
-	return true;
+        return ProcessDirectoryContents(PathT(this), [&](std::string const &Element, bool IsFile, bool IsDir)
+	{
+		Callback(Enter(Element), IsFile, IsDir);
+	});
 }
 
 bool PathElementT::Delete(void) const
 {
 #ifdef _WIN32
-	return _wunlink(reinterpret_cast<wchar_t const *>(ToNativeString(Render()).c_str())) == 0;
+	return _wunlink(&ToNativeString(Render())[0]) == 0;
 #else
 	return unlink(Render().c_str()) == 0;
 #endif
+}
+
+bool PathElementT::DeleteDirectory(void) const
+{
+	bool Failed = false;
+	std::list<std::pair<PathT, bool>> Directories{{PathT(this), false}};
+	while (!Directories.empty())
+	{
+		if (!Directories.back().second)
+		{
+			Directories.back().second = true;
+			Directories.back().first->List([&](PathT &&Path, bool IsFile, bool IsDir)
+			{
+				if (!IsFile && !IsDir) return false; // Can't delete special files, probably
+				if (IsFile) Failed = !Path->Delete();
+				if (Failed) return false;
+				if (IsDir) Directories.push_back({std::move(Path), false});
+				return true;
+			});
+			if (Failed) return false;
+		}
+		else
+		{
+#ifdef _WIN32
+			if (RemoveDirectoryW(&ToNativeString(Directories.back().first->Render)[0]) == 0)
+				return false;
+#else
+			if (rmdir(Directories.back().first->Render().c_str()) != 0)
+				if (errno != ENOENT) return false;
+#endif
+			Directories.pop_back();
+		}
+	}
+	return true;
 }
 
 bool PathElementT::CreateDirectory(void) const
@@ -166,7 +288,7 @@ bool PathElementT::CreateDirectory(void) const
 	std::list<PathElementT const *> Parts;
 	{
 		VariantT <PathElementT const *, PathSettingsT *> Part(this);
-		while (Part.Is<PathElementT>())
+		while (Part.Is<PathElementT const *>())
 		{
 			Parts.push_front(Part.Get<PathElementT const *>());
 			Part = Part.Get<PathElementT const *>()->Parent;
@@ -175,9 +297,9 @@ bool PathElementT::CreateDirectory(void) const
 	for (auto &Part : Parts)
 	{
 #ifdef _WIN32
-		int Result = _wmkdir(reinterpret_cast<wchar_t const *>(ToNativeString(Part->Render()).c_str()));
+		int Result = _wmkdir(&ToNativeString(Part->Render())[0]);
 #else
-		int Result = mkdir((Part->Render()).c_str(), 0777);
+		int Result = mkdir(Part->Render().c_str(), 0777);
 #endif
 		if (Result == -1 && errno != EEXIST)
 			return false;
@@ -185,35 +307,20 @@ bool PathElementT::CreateDirectory(void) const
 	return true;
 }
 
-size_t PathElementT::Depth(void) const
+bool PathElementT::GoTo(void) const
 {
-	size_t Count = 0;
-	VariantT <PathElementT const *, PathSettingsT *> Part(this);
-	while (Part.Is<PathElementT>())
-	{
-		++Count;
-		Part = Part.Get<PathElementT const *>()->Parent;
-	}
-	return Count;
+#ifdef _WIN32
+	return SetCurrentDirectory(&ToNativeString(Render())[0]);
+#else
+	return chdir(Render().c_str()) == 0;
+#endif
 }
 
-std::string const &PathElementT::Filename(void) const { return Value; }
-
-std::string PathElementT::Directory(void) const { return Parent.Is<PathElementT const *>() ? Parent.Get<PathElementT const *>()->Render() : Render(); }
-
-OptionalT<std::string> PathElementT::Extension(void) const
+PathElementT::PathElementT(PathElementT const *Parent, std::string const &Value) : Value(Value), Parent(Parent)
 {
-	std::smatch Matches;
-	std::regex_search(Value, Matches, std::regex("\\.([^.]+)$"));
-	for (auto &Match : Matches) return Match.str();
-	return {};
-}
-
-PathElementT::PathElementT(PathElementT const *Parent, std::string const &Value) : Value(Value), Parent(Parent) 
-{ 
 	Assert(Parent);
 	Assert(this->Parent.Is<PathElementT const *>());
-	++Parent->Count; 
+	++Parent->Count;
 }
 
 static std::regex const DriveRegex("^([a-zA-Z]:)(.*)$");
@@ -232,7 +339,7 @@ PathT PathT::Here(void)
 {
 #ifdef _WIN32
 	std::vector<char> Buffer(GetCurrentDirectory(0, nullptr));
-	if (!GetCurrentDirectory(Buffer.size(), &Buffer[0])) 
+	if (!GetCurrentDirectory(Buffer.size(), &Buffer[0]))
 		throw ConstructionErrorT() << "Couldn't obtain working directory!";
 	return Absolute(std::string(&Buffer[0], Buffer.size()));
 #else
@@ -251,17 +358,17 @@ PathT PathT::Qualify(std::string const &Raw)
 	if (std::regex_search(Raw, DriveMatch, DriveRegex)) return Absolute(Raw);
 	return Here()->EnterRaw(Raw);
 }
-	
+
 PathT PathT::Temp(bool File, OptionalT<PathT> const &Base)
 {
 #ifdef _WIN32
 	std::vector<wchar_t> BaseString;
-	if (Base) 
+	if (Base)
 	{
-		auto Native = ToNativeString((*Base)->Render());
-		BaseString.insert(BaseString.begin(), Native.begin(), Native.end());
+		BaseString = ToNativeString((*Base)->Render());
+		BaseString.pop_back();
 	}
-	else 
+	else
 	{
 		// Get temp dir
 		BaseString.resize(MAX_PATH);
@@ -280,14 +387,13 @@ PathT PathT::Temp(bool File, OptionalT<PathT> const &Base)
 		AssertGTE(Length, 0);
 		if ((unsigned int)Length > TemporaryFilename.size())
 		{
-			TemporaryFilename.resize(Length + 1);
+			TemporaryFilename.resize(Length);
 			Length = GetLongPathNameW(&TemporaryFilename[0], &TemporaryFilename[0], TemporaryFilename.size());
 			AssertLTE((unsigned int)Length, TemporaryFilename.size());
 		}
-		else TemporaryFilename.resize(Length + 1);
-		TemporaryFilename[TemporaryFilename.size() - 1] = 0;
+		else TemporaryFilename.resize(Length);
 		if (Length == 0) throw ConstructionErrorT() << "Could not qualify the temporary filename.";
-		return Absolute(FromNativeString(std::u16string((char16_t *)&TemporaryFilename[0], TemporaryFilename.size() - 1)));
+		return Absolute(FromNativeString(TemporaryFilename));
 	}
 	else
 	{
@@ -303,9 +409,9 @@ PathT PathT::Temp(bool File, OptionalT<PathT> const &Base)
 				BaseString[Start + Offset] = Characters[Index];
 			}
 			auto Result = _wmkdir(&BaseString[0]);
-			if (Result == -1) 
+			if (Result == -1)
 				std::cout << "Failed to create temporary directory (" << strerror(errno) << ")." << std::endl;
-			else return Absolute(FromNativeString(std::u16string((char16_t *)&BaseString[0], BaseString.size() - 1)));
+			else return Absolute(FromNativeString(BaseString, BaseString.length() - 1));
 		}
 		throw ConstructionErrorT() << "Failed to create temporary directory 3 times (" << strerror(errno) << ").";
 	}
@@ -316,7 +422,7 @@ PathT PathT::Temp(bool File, OptionalT<PathT> const &Base)
 		auto Native = (*Base)->Render();
 		BaseString.insert(BaseString.end(), Native.begin(), Native.end());
 	}
-	else 
+	else
 	{
 		char const *Buffer = getenv("TMPDIR");
 		if (Buffer == nullptr) Buffer = getenv("P_tmpdir");
@@ -347,25 +453,25 @@ PathT PathT::Temp(bool File, OptionalT<PathT> const &Base)
 PathT::PathT(PathElementT const *Element) { Set(Element); }
 
 PathT::PathT(PathSettingsT const &Settings) { Set(new PathElementT(Settings)); }
-	
+
 PathT::PathT(void) { Set(new PathElementT(PathSettingsT{{}, "/"})); }
-	
+
 PathT::PathT(PathT const &Other) { Set(Other.Element); }
 
 void PathT::Set(PathElementT const *Element)
-{ 
+{
 	this->Element = Element;
 	Element->Count += 1;
 }
 
-PathT::~PathT(void) 
+PathT::~PathT(void)
 {
 	Element->Count -= 1;
 	if (Element->Count == 0) delete Element;
 }
-	
+
 PathT &PathT::operator =(PathT const &Other) { Set(Other.Element); return *this; }
-	
+
 PathElementT const *PathT::operator ->(void) const { return Element; }
 
 PathT::operator PathElementT const *(void) const { return Element; }

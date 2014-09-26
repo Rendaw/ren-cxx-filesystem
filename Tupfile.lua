@@ -1,1 +1,5 @@
-FilesystemObjects = Define.Objects{ Sources = Item '*.cxx' }
+FilesystemObjects = Define.Objects
+{ 
+	Sources = Item '*.cxx',
+	BuildFlags = '-fPIC'
+}
