@@ -165,7 +165,6 @@ bool PathElementT::FileExists(void) const
 {
 #ifdef _WIN32
 	auto Attributes = GetFileAttributesW(&ToNativeString("\\\\?\\" + Render())[0]); // Doesn't work for some reason -- mixed slashes?
-	//auto Attributes = GetFileAttributesW(&ToNativeString(Render())[0]);
 	if (Attributes == 0xFFFFFFFF) return false;
 	if (Attributes == 0x10) return false;
 	return true;
@@ -181,7 +180,6 @@ bool PathElementT::DirectoryExists(void) const
 {
 #ifdef _WIN32
         return GetFileAttributesW(&ToNativeString("\\\\?\\" + Render())[0]) & 0x10;
-        //return GetFileAttributesW(&ToNativeString(Render())[0]) & 0x10;
 #else
         struct stat StatResultBuffer;
         int Result = stat(Render().c_str(), &StatResultBuffer);
