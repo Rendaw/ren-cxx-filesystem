@@ -25,7 +25,6 @@ struct SeedRandomT
 
 namespace Filesystem
 {
-
 PathElementT::PathElementT(PathSettingsT const &Settings) : Parent(new PathSettingsT(Settings)) { }
 
 PathElementT::~PathElementT(void)
@@ -450,24 +449,51 @@ PathT PathT::Temp(bool File, OptionalT<PathT> const &Base)
 #endif
 }
 
-PathT::PathT(PathElementT const *Element) { Set(Element); }
+PathT::PathT(PathElementT const *Element)
+#ifndef NDEBUG
+	: Element(nullptr) 
+#endif
+	{ Set(Element); }
 
-PathT::PathT(PathSettingsT const &Settings) { Set(new PathElementT(Settings)); }
+PathT::PathT(PathSettingsT const &Settings)
+#ifndef NDEBUG
+	: Element(nullptr) 
+#endif
+	{ Set(new PathElementT(Settings)); }
 
-PathT::PathT(void) { Set(new PathElementT(PathSettingsT{{}, "/"})); }
+PathT::PathT(void)
+#ifndef NDEBUG
+	: Element(nullptr) 
+#endif
+	{ Set(new PathElementT(PathSettingsT{{}, "/"})); }
 
-PathT::PathT(PathT const &Other) { Set(Other.Element); }
+PathT::PathT(PathT const &Other) 
+#ifndef NDEBUG
+	: Element(nullptr) 
+#endif
+	{ Set(Other.Element); }
 
 void PathT::Set(PathElementT const *Element)
 {
+	Clear();
+	Assert(!this->Element);
 	this->Element = Element;
 	Element->Count += 1;
+}
+	
+void PathT::Clear(void)
+{
+	if (Element)
+	{
+		Element->Count -= 1;
+		if (Element->Count == 0) delete Element;
+		Element = nullptr;
+	}
 }
 
 PathT::~PathT(void)
 {
-	Element->Count -= 1;
-	if (Element->Count == 0) delete Element;
+	Clear();
 }
 
 PathT &PathT::operator =(PathT const &Other) { Set(Other.Element); return *this; }

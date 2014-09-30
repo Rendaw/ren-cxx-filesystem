@@ -81,6 +81,7 @@ struct PathT
 	PathT &operator =(PathT const &Other);
 
 	void Set(PathElementT const *Element);
+	void Clear(void);
 
 	PathElementT const *operator ->(void) const;
 	operator PathElementT const *(void) const;
