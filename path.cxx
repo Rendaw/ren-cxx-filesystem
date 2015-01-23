@@ -1,4 +1,4 @@
-#include "filesystem.h"
+#include "path.h"
 
 #include <regex>
 
@@ -71,7 +71,8 @@ std::string PathElementT::Render(void) const
 
 std::string const &PathElementT::Filename(void) const { return Value; }
 
-std::string PathElementT::Directory(void) const { return Parent.Is<PathElementT const *>() ? Parent.Get<PathElementT const *>()->Render() : Render(); }
+std::string PathElementT::Directory(void) const 
+	{ return Parent.Is<PathElementT const *>() ? Parent.Get<PathElementT const *>()->Render() : Render(); }
 
 OptionalT<std::string> PathElementT::Extension(void) const
 {
@@ -131,8 +132,8 @@ PathT PathElementT::EnterRaw(std::string const &Raw) const
 	{
 		if (Match.length() == 0) {}
 		else if (Match == ".") {}
-		else if (Match == "..") Out = Out->Exit();
-		else Out = Out->Enter(Match);
+		else if (Match == "..") Out = Out.Exit();
+		else Out = Out.Enter(Match);
 	};
 	std::smatch Matches;
 	while (std::regex_search(Text, Matches, ElementRegex))
@@ -192,7 +193,7 @@ static bool ProcessDirectoryContents(PathT const &DirectoryName, std::function<v
 #ifdef _WIN32
         WIN32_FIND_DATAW ElementInfo;
         auto DirectoryResource = FindFirstFileW(
-		&ToNativeString(DirectoryName->Render() + "\\*")[0],
+		&ToNativeString(DirectoryName.Render() + "\\*")[0],
 		&ElementInfo);
         if (DirectoryResource == INVALID_HANDLE_VALUE) return false;
 
@@ -209,7 +210,7 @@ static bool ProcessDirectoryContents(PathT const &DirectoryName, std::function<v
 
         FindClose(DirectoryResource);
 #else
-        auto DirectoryResource = opendir(DirectoryName->Render().c_str());
+        auto DirectoryResource = opendir(DirectoryName.Render().c_str());
         if (DirectoryResource == nullptr) return false;
 
         dirent *ElementInfo;
@@ -254,10 +255,10 @@ bool PathElementT::DeleteDirectory(void) const
 		if (!Directories.back().second)
 		{
 			Directories.back().second = true;
-			Directories.back().first->List([&](PathT &&Path, bool IsFile, bool IsDir)
+			Directories.back().first.List([&](PathT &&Path, bool IsFile, bool IsDir)
 			{
 				if (!IsFile && !IsDir) return false; // Can't delete special files, probably
-				if (IsFile) Failed = !Path->Delete();
+				if (IsFile) Failed = !Path.Delete();
 				if (Failed) return false;
 				if (IsDir) Directories.push_back({std::move(Path), false});
 				return true;
@@ -267,10 +268,10 @@ bool PathElementT::DeleteDirectory(void) const
 		else
 		{
 #ifdef _WIN32
-			if (RemoveDirectoryW(&ToNativeString(Directories.back().first->Render())[0]) == 0)
+			if (RemoveDirectoryW(&ToNativeString(Directories.back().first)[0]) == 0)
 				return false;
 #else
-			if (rmdir(Directories.back().first->Render().c_str()) != 0)
+			if (rmdir(Directories.back().first.Render().c_str()) != 0)
 				if (errno != ENOENT) return false;
 #endif
 			Directories.pop_back();
@@ -328,9 +329,9 @@ PathT PathT::Absolute(std::string const &Raw)
 #ifdef _WIN32
 	std::smatch DriveMatch;
 	if (!Assert(std::regex_search(Raw, DriveMatch, DriveRegex))) throw ConstructionErrorT() << "Windows absolute paths must contain drive.  This path is invalid: " << Raw;
-	return PathT(PathSettingsT{DriveMatch[1].str(), "\\"})->EnterRaw(DriveMatch[2]);
+	return PathT(PathSettingsT{DriveMatch[1].str(), "\\"}).EnterRaw(DriveMatch[2]);
 #else
-	return PathT(PathSettingsT{{}, std::string(1, Raw[0])})->EnterRaw(Raw);
+	return PathT(PathSettingsT{{}, std::string(1, Raw[0])}).EnterRaw(Raw);
 #endif
 }
 
@@ -355,7 +356,7 @@ PathT PathT::Qualify(std::string const &Raw)
 	if (Raw[0] == '\\') return Absolute(Raw);
 	std::smatch DriveMatch;
 	if (std::regex_search(Raw, DriveMatch, DriveRegex)) return Absolute(Raw);
-	return Here()->EnterRaw(Raw);
+	return Here().EnterRaw(Raw);
 }
 
 PathT PathT::Temp(bool File, OptionalT<PathT> const &Base)
@@ -364,7 +365,7 @@ PathT PathT::Temp(bool File, OptionalT<PathT> const &Base)
 	std::vector<wchar_t> BaseString;
 	if (Base)
 	{
-		BaseString = ToNativeString((*Base)->Render());
+		BaseString = ToNativeString(*Base);
 		BaseString.pop_back();
 	}
 	else
@@ -418,7 +419,7 @@ PathT PathT::Temp(bool File, OptionalT<PathT> const &Base)
 	std::vector<char> BaseString;
 	if (Base)
 	{
-		auto Native = (*Base)->Render();
+		auto Native = (*Base).Render();
 		BaseString.insert(BaseString.end(), Native.begin(), Native.end());
 	}
 	else
@@ -498,9 +499,37 @@ PathT::~PathT(void)
 
 PathT &PathT::operator =(PathT const &Other) { Set(Other.Element); return *this; }
 
-PathElementT const *PathT::operator ->(void) const { return Element; }
+//PathElementT const *PathT::operator ->(void) const { return Element; }
 
 PathT::operator PathElementT const *(void) const { return Element; }
+	
+PathT::operator std::string(void) const { return Render(); }
+
+std::string PathT::Render(void) const { return Element->Render(); }
+std::string const &PathT::Filename(void) const { return Element->Filename(); }
+std::string PathT::Directory(void) const { return Element->Directory(); }
+OptionalT<std::string> PathT::Extension(void) const { return Element->Extension(); }
+
+size_t PathT::Depth(void) const { return Element->Depth(); }
+
+bool PathT::Contains(PathElementT const *Other) const { return Element->Contains(Other); }
+
+PathT PathT::Enter(std::string const &Value) const { return Element->Enter(Value); }
+PathT PathT::EnterRaw(std::string const &Raw) const { return Element->EnterRaw(Raw); }
+PathT PathT::Exit(void) const { return Element->Exit(); }
+
+bool PathT::Exists(void) const { return Element->Exists(); }
+bool PathT::FileExists(void) const { return Element->FileExists(); }
+bool PathT::DirectoryExists(void) const { return Element->DirectoryExists(); }
+
+bool PathT::List(std::function<bool(PathT &&Path, bool IsFile, bool IsDir)> const &Callback) const
+	{ return Element->List(Callback); }
+
+bool PathT::Delete(void) const { return Element->Delete(); }
+bool PathT::DeleteDirectory(void) const { return Element->DeleteDirectory(); }
+bool PathT::CreateDirectory(void) const { return Element->CreateDirectory(); }
+
+bool PathT::GoTo(void) const { return Element->GoTo(); }
 
 }
 

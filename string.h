@@ -1,5 +1,5 @@
-#ifndef string_h
-#define string_h
+#ifndef ren_cxx_filesystem__string_h
+#define ren_cxx_filesystem__string_h
 
 #include "../ren-cxx-basics/extrastandard.h"
 
