@@ -23,6 +23,8 @@ struct SeedRandomT
 #include <unistd.h>
 #endif
 
+#include "../ren-cxx-basics/error.h"
+
 namespace Filesystem
 {
 PathElementT::PathElementT(PathSettingsT const &Settings) : Parent(new PathSettingsT(Settings)) { }

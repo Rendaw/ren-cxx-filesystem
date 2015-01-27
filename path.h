@@ -1,7 +1,7 @@
 #ifndef ren_cxx_filesystem__path_h
 #define ren_cxx_filesystem__path_h
 
-#include "../ren-cxx-basics/type.h"
+#include "../ren-cxx-basics/variant.h"
 #include "string.h"
 
 namespace Filesystem
