@@ -75,11 +75,11 @@ int main(int, char **)
 
 		Assert(TestPath.Exit().CreateDirectory());
 		{
-			auto Created = Filesystem::File::OpenWrite(TestPath);
+			auto Created = Filesystem::FileT::OpenWrite(TestPath);
 			Assert(Created);
 		}
 		{
-			auto Opened = Filesystem::File::OpenRead(TestPath);
+			auto Opened = Filesystem::FileT::OpenRead(TestPath);
 			Assert(Opened);
 		}
 		Assert(TestPath.Exit().DeleteDirectory());
@@ -107,11 +107,11 @@ int main(int, char **)
 
 		Assert(TestPath.Exit().CreateDirectory());
 		{
-			auto Created = Filesystem::File::OpenWrite(TestPath);
+			auto Created = Filesystem::FileT::OpenWrite(TestPath);
 			Assert(Created);
 		}
 		{
-			auto Opened = Filesystem::File::OpenRead(TestPath);
+			auto Opened = Filesystem::FileT::OpenRead(TestPath);
 			Assert(Opened);
 		}
 		Assert(TestPath.Exit().DeleteDirectory());
