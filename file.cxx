@@ -39,11 +39,14 @@ uint8_t *ReadBufferT::EmptyStart(void)
 uint8_t const *ReadBufferT::EmptyStart(void) const
 	{ return &Data[Stop]; }
 
-void ReadBufferT::Filled(size_t FillSize)
+void ReadBufferT::Fill(size_t FillSize)
 { 
 	Stop += FillSize; 
 	AssertLTE(Stop, Total); 
 }
+	
+size_t ReadBufferT::Filled(void) const
+	{ return Stop - Start; }
 
 uint8_t *ReadBufferT::FilledStart(size_t RequiredSize, size_t Offset)
 {

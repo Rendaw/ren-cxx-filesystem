@@ -37,9 +37,10 @@ struct ReadBufferT
 	void Expand(size_t AddSize);
 	uint8_t *EmptyStart(void);
 	uint8_t const *EmptyStart(void) const;
-	void Filled(size_t);
+	void Fill(size_t);
 
 	// Draining
+	size_t Filled(void) const;
 	uint8_t *FilledStart(size_t RequiredSize, size_t Offset = 0);
 	uint8_t const *FilledStart(size_t RequiredSize, size_t Offset = 0) const;
 	void Consume(size_t ReduceSize);
@@ -75,7 +76,7 @@ struct FileT
 		if (Buffer.Available() < 4096)
 			Buffer.Expand(4096);
 		auto ReadSize = fread(Buffer.EmptyStart(), 1, Buffer.Available(), Core); // TODO handle errors
-		Buffer.Filled(ReadSize);
+		Buffer.Fill(ReadSize);
 		return *this;
 	}
 	FileT &Seek(size_t Offset);
