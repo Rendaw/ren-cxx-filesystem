@@ -68,6 +68,7 @@ struct FileT
 
 	operator bool(void) const;
 	FileT &Write(std::vector<uint8_t> const &Data);
+	FileT &Write(std::string const &Data);
 	FileT &Read(std::vector<uint8_t> &Buffer);
 	template <typename BufferT> FileT &Read(BufferT &Buffer)
 	{

@@ -104,6 +104,13 @@ FileT &FileT::Write(std::vector<uint8_t> const &Data)
 	fwrite(&Data[0], Data.size(), 1, Core); // TODO handle errors
 	return *this;
 }
+	
+FileT &FileT::Write(std::string const &Data)
+{
+	Assert(Core);
+	fwrite(Data.c_str(), Data.size(), 1, Core); // TODO handle errors
+	return *this;
+}
 
 FileT &FileT::Read(std::vector<uint8_t> &Buffer)
 {
