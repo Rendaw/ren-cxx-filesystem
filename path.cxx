@@ -501,8 +501,6 @@ PathT::~PathT(void)
 
 PathT &PathT::operator =(PathT const &Other) { Set(Other.Element); return *this; }
 
-//PathElementT const *PathT::operator ->(void) const { return Element; }
-
 PathT::operator PathElementT const *(void) const { return Element; }
 	
 PathT::operator std::string(void) const { return Render(); }

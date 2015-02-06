@@ -71,7 +71,6 @@ struct PathT
 	void Set(PathElementT const *Element);
 	void Clear(void);
 
-	//PathElementT const *operator ->(void) const;
 	operator PathElementT const *(void) const;
 	
 	operator std::string(void) const;
@@ -106,10 +105,10 @@ struct PathT
 		PathElementT const *Element;
 };
 
-}
-
 inline std::ostream &operator <<(std::ostream &Stream, Filesystem::PathT const &Value)
 	{ return Stream << Value.Render(); }
+
+}
 
 #endif
 
