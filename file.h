@@ -85,7 +85,7 @@ struct FileT
 	~FileT(void);
 
 	private:
-		FileT(FILE *Core);
+		FileT(std::string const &File, FILE *Core);
 		FILE *Core;
 };
 

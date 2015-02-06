@@ -2,6 +2,8 @@
 
 #include <cstring>
 
+#include "../ren-cxx-basics/error.h"
+
 ReadBufferT::ReadBufferT(size_t Size) : 
 	Data(std::make_unique<uint8_t[]>(Size)),
 	Start(0), 
@@ -71,10 +73,10 @@ void ReadBufferT::Consume(size_t Size)
 namespace Filesystem
 {
 
-FileT FileT::OpenRead(std::string const &Path) { return FileT(fopen_read(Path)); }
-FileT FileT::OpenWrite(std::string const &Path) { return FileT(fopen_write(Path)); }
-FileT FileT::OpenAppend(std::string const &Path) { return FileT(fopen_append(Path)); }
-FileT FileT::OpenModify(std::string const &Path) { return FileT(fopen_modify(Path)); }
+FileT FileT::OpenRead(std::string const &Path) { return FileT(Path, fopen_read(Path)); }
+FileT FileT::OpenWrite(std::string const &Path) { return FileT(Path, fopen_write(Path)); }
+FileT FileT::OpenAppend(std::string const &Path) { return FileT(Path, fopen_append(Path)); }
+FileT FileT::OpenModify(std::string const &Path) { return FileT(Path, fopen_modify(Path)); }
 
 FileT::FileT(void) : Core(nullptr) {}
 
@@ -132,7 +134,11 @@ FileT::~FileT(void)
 	if (Core) fclose(Core); 
 }
 
-FileT::FileT(FILE *Core) : Core(Core) {}
+FileT::FileT(std::string const &Path, FILE *Core) : Core(Core) 
+{
+	if (!Core)
+		throw SystemErrorT() << "Unable to open file [" << Path << "]";
+}
 
 }
 
