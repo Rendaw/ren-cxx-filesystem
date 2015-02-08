@@ -16,30 +16,41 @@ size_t ReadBufferT::Available(void) const
 {
 	return Total - Stop;
 }
+	
+void ReadBufferT::Ensure(size_t NeededSize)
+{
+	if (Available() < NeededSize)
+		Expand(NeededSize);
+}
 
 void ReadBufferT::Expand(size_t AddSize)
 {
-	auto Used = Stop - Start;
+	auto const OldStart = Start;
 	auto Potential = Start + (Total - Stop);
 	if (AddSize > Potential)
 	{
 		auto Difference = Potential - AddSize;
 		auto Replacement = std::make_unique<uint8_t[]>(Total + Difference * 2); // or something
-		memcpy(&Replacement[0], &Data[Start], Used);
+		memcpy(&Replacement[0], &Data[Start], Filled());
+		Data = std::move(Replacement);
 	}
 	else
 	{
-		memmove(&Data[0], &Data[Start], Used);
+		memmove(&Data[0], &Data[Start], Filled());
 	}
 	Start = 0;
-	Stop -= Used;
+	Stop -= OldStart;
 }
 
 uint8_t *ReadBufferT::EmptyStart(void)
-	{ return &Data[Stop]; }
+{ 
+	return &Data[Stop]; 
+}
 
 uint8_t const *ReadBufferT::EmptyStart(void) const
-	{ return &Data[Stop]; }
+{ 
+	return &Data[Stop]; 
+}
 
 void ReadBufferT::Fill(size_t FillSize)
 { 
@@ -48,7 +59,19 @@ void ReadBufferT::Fill(size_t FillSize)
 }
 	
 size_t ReadBufferT::Filled(void) const
-	{ return Stop - Start; }
+{ 
+	return Stop - Start; 
+}
+
+uint8_t *ReadBufferT::FilledStart(void)
+{ 
+	return &Data[Start]; 
+}
+
+uint8_t const *ReadBufferT::FilledStart(void) const
+{ 
+	return &Data[Start]; 
+}
 
 uint8_t *ReadBufferT::FilledStart(size_t RequiredSize, size_t Offset)
 {

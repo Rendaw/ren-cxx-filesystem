@@ -34,6 +34,7 @@ struct ReadBufferT
 
 	// Filling
 	size_t Available(void) const;
+	void Ensure(size_t NeededSize);
 	void Expand(size_t AddSize);
 	uint8_t *EmptyStart(void);
 	uint8_t const *EmptyStart(void) const;
@@ -41,6 +42,8 @@ struct ReadBufferT
 
 	// Draining
 	size_t Filled(void) const;
+	uint8_t *FilledStart(void);
+	uint8_t const *FilledStart(void) const;
 	uint8_t *FilledStart(size_t RequiredSize, size_t Offset = 0);
 	uint8_t const *FilledStart(size_t RequiredSize, size_t Offset = 0) const;
 	void Consume(size_t ReduceSize);
