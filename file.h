@@ -83,6 +83,7 @@ struct FileT
 		Buffer.Fill(ReadSize);
 		return *this;
 	}
+	std::vector<uint8_t> ReadAll(void);
 	FileT &Seek(size_t Offset);
 
 	~FileT(void);

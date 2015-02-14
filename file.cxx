@@ -144,6 +144,13 @@ FileT &FileT::Read(std::vector<uint8_t> &Buffer)
 	fread(&Buffer[0], 1, Buffer.size(), Core); // TODO handle errors
 	return *this;
 }
+	
+std::vector<uint8_t> FileT::ReadAll(void)
+{
+	ReadBufferT Buffer;
+	while (*this) Read(Buffer);
+	return std::vector<uint8_t>(Buffer.FilledStart(), Buffer.FilledStart() + Buffer.Filled());
+}
 
 FileT &FileT::Seek(size_t Offset) 
 { 
@@ -160,7 +167,7 @@ FileT::~FileT(void)
 FileT::FileT(std::string const &Path, FILE *Core) : Core(Core) 
 {
 	if (!Core)
-		throw SystemErrorT() << "Unable to open file [" << Path << "]";
+		throw ConstructionErrorT() << "Unable to open file [" << Path << "]";
 }
 
 }
