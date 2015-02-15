@@ -1,5 +1,6 @@
 #include <cassert>
 #include <iostream>
+#include <set>
 
 #include "../path.h"
 #include "../file.h"
@@ -40,21 +41,26 @@ int main(int, char **)
 	AssertE(Filesystem::PathT::Absolute(Prefix + "/a/c.txt").Directory(), Prefix + SEP "a");
 
 	{
-		std::vector<std::string> Files, Dirs;
+		//std::vector<std::string> Files, Dirs;
+		std::set<std::string> Files, Dirs; // tup fuse error?  Was seeing a duplicated directory.
 		Filesystem::PathT::Here().Enter("filesystemtesttree").Enter("a").List(
 			[&](Filesystem::PathT &&Path, bool IsFile, bool IsDir)
 		{
-			if (IsFile) Files.push_back(Path.Filename());
-			else if (IsDir) Dirs.push_back(Path.Filename());
+			std::cout << "Checking listed file: " << Path << std::endl;
+			if (IsFile) Files.insert(Path.Filename());
+			else if (IsDir) Dirs.insert(Path.Filename());
 			else Assert(false);
 			return true;
 		});
 		AssertE(Files.size(), 3u);
-		{ bool Found = false; for (auto const &Elem : Files) if (Elem == "1.txt") Found = true; Assert(Found); }
+		AssertE(Files.count("1.txt"), 1u);
+		AssertE(Files.count("2.txt"), 1u);
+		AssertE(Files.count("3.txt"), 1u);
+		/*{ bool Found = false; for (auto const &Elem : Files) if (Elem == "1.txt") Found = true; Assert(Found); }
 		{ bool Found = false; for (auto const &Elem : Files) if (Elem == "2.txt") Found = true; Assert(Found); }
-		{ bool Found = false; for (auto const &Elem : Files) if (Elem == "3.txt") Found = true; Assert(Found); }
+		{ bool Found = false; for (auto const &Elem : Files) if (Elem == "3.txt") Found = true; Assert(Found); }*/
 		AssertE(Dirs.size(), 1u);
-		AssertE(Dirs[0], "a1");
+		AssertE(Dirs.count("a1"), 1u);
 	}
 
 	// ascii
