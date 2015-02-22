@@ -7,6 +7,7 @@
 #include <memory>
 
 #include "../ren-cxx-basics/extrastandard.h"
+#include "../ren-cxx-basics/error.h"
 
 #ifdef __WIN32
 inline FILE *fopen_read(std::string const &Filename)
@@ -70,18 +71,21 @@ struct FileT
 	FileT &operator =(FileT const &Other) = delete;
 
 	operator bool(void) const;
-	FileT &Write(std::vector<uint8_t> const &Data);
-	FileT &Write(std::string const &Data);
-	FileT &Read(std::vector<uint8_t> &Buffer);
-	template <typename BufferT> FileT &Read(BufferT &Buffer)
+	void Write(std::vector<uint8_t> const &Data);
+	void Write(std::string const &Data);
+	bool Read(std::vector<uint8_t> &Buffer);
+	template <typename BufferT> bool Read(BufferT &Buffer)
 	{
 		// BufferT must provide the methods in ReadBufferT above
 		Assert(Core);
+		if (!*this) return false;
 		if (Buffer.Available() < 4096)
 			Buffer.Expand(4096);
-		auto ReadSize = fread(Buffer.EmptyStart(), 1, Buffer.Available(), Core); // TODO handle errors
+		auto ReadSize = fread(Buffer.EmptyStart(), 1, Buffer.Available(), Core);
+		if ((ReadSize == 0) && ferror(Core)) 
+			throw SYSTEM_ERROR << "Error reading from [" << Path << "]: " << strerror(errno);
 		Buffer.Fill(ReadSize);
-		return *this;
+		return true;
 	}
 	std::vector<uint8_t> ReadAll(void);
 	FileT &Seek(size_t Offset);
@@ -90,6 +94,7 @@ struct FileT
 
 	private:
 		FileT(std::string const &File, FILE *Core);
+		std::string Path;
 		FILE *Core;
 };
 

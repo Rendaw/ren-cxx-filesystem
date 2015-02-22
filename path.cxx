@@ -149,7 +149,7 @@ PathT PathElementT::EnterRaw(std::string const &Raw) const
 
 PathT PathElementT::Exit(void) const
 {
-	if (Parent.Is<PathSettingsT *>()) throw ConstructionErrorT() << "Cannot exit root path.";
+	if (Parent.Is<PathSettingsT *>()) throw CONSTRUCTION_ERROR << "Cannot exit root path.";
 	return {Parent.Get<PathElementT const *>()};
 }
 
@@ -330,7 +330,7 @@ PathT PathT::Absolute(std::string const &Raw)
 {
 #ifdef _WIN32
 	std::smatch DriveMatch;
-	if (!Assert(std::regex_search(Raw, DriveMatch, DriveRegex))) throw ConstructionErrorT() << "Windows absolute paths must contain drive.  This path is invalid: " << Raw;
+	if (!Assert(std::regex_search(Raw, DriveMatch, DriveRegex))) throw CONSTRUCTION_ERROR << "Windows absolute paths must contain drive.  This path is invalid: " << Raw;
 	return PathT(PathSettingsT{DriveMatch[1].str(), "\\"}).EnterRaw(DriveMatch[2]);
 #else
 	return PathT(PathSettingsT{{}, std::string(1, Raw[0])}).EnterRaw(Raw);
@@ -342,11 +342,11 @@ PathT PathT::Here(void)
 #ifdef _WIN32
 	std::vector<wchar_t> Buffer(GetCurrentDirectoryW(0, nullptr));
 	if (!GetCurrentDirectoryW(Buffer.size(), &Buffer[0]))
-		throw ConstructionErrorT() << "Couldn't obtain working directory!";
+		throw CONSTRUCTION_ERROR << "Couldn't obtain working directory!";
 	return Absolute(FromNativeString(&Buffer[0], Buffer.size() - 1));
 #else
 	std::vector<char> Buffer(FILENAME_MAX);
-	if (!getcwd(&Buffer[0], Buffer.size())) throw ConstructionErrorT() << "Couldn't obtain working directory!";
+	if (!getcwd(&Buffer[0], Buffer.size())) throw CONSTRUCTION_ERROR << "Couldn't obtain working directory!";
 	return Absolute(std::string(&Buffer[0]));
 #endif
 }
@@ -375,7 +375,7 @@ PathT PathT::Temp(bool File, OptionalT<PathT> const &Base)
 		// Get temp dir
 		BaseString.resize(MAX_PATH);
 		auto Length = GetTempPathW(BaseString.size(), &BaseString[0]);
-		if (Length <= 0) throw ConstructionErrorT() << "Could not find temporary file directory.";
+		if (Length <= 0) throw CONSTRUCTION_ERROR << "Could not find temporary file directory.";
 		BaseString.resize(Length);
 	}
 
@@ -384,7 +384,7 @@ PathT PathT::Temp(bool File, OptionalT<PathT> const &Base)
 		std::vector<wchar_t> TemporaryFilename;
 		TemporaryFilename.resize(MAX_PATH);
 		auto Length = GetTempFileNameW(&BaseString[0], L"zar", 0, &TemporaryFilename[0]);
-		if (Length == 0) throw ConstructionErrorT() << "Could not determine a temporary filename.";
+		if (Length == 0) throw CONSTRUCTION_ERROR << "Could not determine a temporary filename.";
 		Length = GetLongPathNameW(&TemporaryFilename[0], &TemporaryFilename[0], TemporaryFilename.size());
 		AssertGTE(Length, 0);
 		if ((unsigned int)Length > TemporaryFilename.size())
@@ -394,7 +394,7 @@ PathT PathT::Temp(bool File, OptionalT<PathT> const &Base)
 			AssertLTE((unsigned int)Length, TemporaryFilename.size());
 		}
 		else TemporaryFilename.resize(Length);
-		if (Length == 0) throw ConstructionErrorT() << "Could not qualify the temporary filename.";
+		if (Length == 0) throw CONSTRUCTION_ERROR << "Could not qualify the temporary filename.";
 		return Absolute(FromNativeString(TemporaryFilename));
 	}
 	else
@@ -415,7 +415,7 @@ PathT PathT::Temp(bool File, OptionalT<PathT> const &Base)
 				std::cout << "Failed to create temporary directory (" << strerror(errno) << ")." << std::endl;
 			else return Absolute(FromNativeString(&BaseString[0], BaseString.size() - 1));
 		}
-		throw ConstructionErrorT() << "Failed to create temporary directory 3 times (" << strerror(errno) << ").";
+		throw CONSTRUCTION_ERROR << "Failed to create temporary directory 3 times (" << strerror(errno) << ").";
 	}
 #else
 	std::vector<char> BaseString;
@@ -439,14 +439,14 @@ PathT PathT::Temp(bool File, OptionalT<PathT> const &Base)
 	if (File)
 	{
 		auto Result = mkstemp(&BaseString[0]);
-		if (Result < 0) throw ConstructionErrorT() << "Failed to create temporary file with template " << std::string(&BaseString[0], BaseString.size()) << ".";
+		if (Result < 0) throw CONSTRUCTION_ERROR << "Failed to create temporary file with template " << std::string(&BaseString[0], BaseString.size()) << ".";
 		close(Result);
 		return Absolute(std::string(&BaseString[0], BaseString.size() - 1));
 	}
 	else
 	{
 		auto Result = mkdtemp(&BaseString[0]);
-		if (Result <= 0) throw ConstructionErrorT() << "Failed to create temporary directory with template " << std::string(&BaseString[0], BaseString.size()) << ".";
+		if (Result <= 0) throw CONSTRUCTION_ERROR << "Failed to create temporary directory with template " << std::string(&BaseString[0], BaseString.size()) << ".";
 		return Absolute(Result);
 	}
 #endif

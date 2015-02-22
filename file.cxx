@@ -2,8 +2,6 @@
 
 #include <cstring>
 
-#include "../ren-cxx-basics/error.h"
-
 ReadBufferT::ReadBufferT(size_t Size) : 
 	Data(std::make_unique<uint8_t[]>(Size)),
 	Start(0), 
@@ -103,13 +101,14 @@ FileT FileT::OpenModify(std::string const &Path) { return FileT(Path, fopen_modi
 
 FileT::FileT(void) : Core(nullptr) {}
 
-FileT::FileT(FileT &&Other) : Core(Other.Core) 
+FileT::FileT(FileT &&Other) : Path(std::move(Other.Path)), Core(Other.Core) 
 { 
 	Other.Core = nullptr; 
 }
 
 FileT &FileT::operator =(FileT &&Other) 
 { 
+	Path = std::move(Other.Path);
 	Core = Other.Core; 
 	Other.Core = nullptr; 
 	return *this; 
@@ -123,32 +122,37 @@ FileT::operator bool(void) const
 	return true;
 }
 
-FileT &FileT::Write(std::vector<uint8_t> const &Data)
+void FileT::Write(std::vector<uint8_t> const &Data)
 {
 	Assert(Core);
-	fwrite(&Data[0], Data.size(), 1, Core); // TODO handle errors
-	return *this;
+	auto Result = fwrite(&Data[0], Data.size(), 1, Core);
+	if ((Result == 0) && ferror(Core)) 
+		throw SYSTEM_ERROR << "Error writing to [" << Path << "]: " << strerror(errno);
 }
 	
-FileT &FileT::Write(std::string const &Data)
+void FileT::Write(std::string const &Data)
 {
 	Assert(Core);
-	fwrite(Data.c_str(), Data.size(), 1, Core); // TODO handle errors
-	return *this;
+	auto Result = fwrite(Data.c_str(), Data.size(), 1, Core);
+	if ((Result == 0) && ferror(Core)) 
+		throw SYSTEM_ERROR << "Error writing to [" << Path << "]: " << strerror(errno);
 }
 
-FileT &FileT::Read(std::vector<uint8_t> &Buffer)
+bool FileT::Read(std::vector<uint8_t> &Buffer)
 {
 	Assert(Core);
+	if (!*this) return false;
 	if (Buffer.empty()) Buffer.resize(4096);
-	fread(&Buffer[0], 1, Buffer.size(), Core); // TODO handle errors
-	return *this;
+	auto Result = fread(&Buffer[0], 1, Buffer.size(), Core); // TODO handle errors
+	if ((Result == 0) && ferror(Core)) 
+		throw SYSTEM_ERROR << "Error reading from [" << Path << "]: " << strerror(errno);
+	return true;
 }
 	
 std::vector<uint8_t> FileT::ReadAll(void)
 {
 	ReadBufferT Buffer;
-	while (*this) Read(Buffer);
+	while (Read(Buffer)) {}
 	return std::vector<uint8_t>(Buffer.FilledStart(), Buffer.FilledStart() + Buffer.Filled());
 }
 
@@ -164,10 +168,10 @@ FileT::~FileT(void)
 	if (Core) fclose(Core); 
 }
 
-FileT::FileT(std::string const &Path, FILE *Core) : Core(Core) 
+FileT::FileT(std::string const &Path, FILE *Core) : Path(Path), Core(Core) 
 {
 	if (!Core)
-		throw ConstructionErrorT() << "Unable to open file [" << Path << "]";
+		throw CONSTRUCTION_ERROR << "Unable to open file [" << Path << "]";
 }
 
 }
