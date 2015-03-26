@@ -146,6 +146,7 @@ bool FileT::Read(std::vector<uint8_t> &Buffer)
 	auto Result = fread(&Buffer[0], 1, Buffer.size(), Core); // TODO handle errors
 	if ((Result == 0) && ferror(Core)) 
 		throw SYSTEM_ERROR << "Error reading from [" << Path << "]: " << strerror(errno);
+	Buffer.resize(Result);
 	return true;
 }
 	
@@ -161,6 +162,12 @@ FileT &FileT::Seek(size_t Offset)
 	Assert(Core);
 	fseek(Core, Offset, SEEK_SET); 
 	return *this;
+}
+
+size_t FileT::Tell(void) const
+{
+	Assert(Core);
+	return ftell(Core);
 }
 
 FileT::~FileT(void) 

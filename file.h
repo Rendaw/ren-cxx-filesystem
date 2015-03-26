@@ -89,6 +89,7 @@ struct FileT
 	}
 	std::vector<uint8_t> ReadAll(void);
 	FileT &Seek(size_t Offset);
+	size_t Tell(void) const;
 
 	~FileT(void);
 
